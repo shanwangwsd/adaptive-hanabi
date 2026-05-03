@@ -1,5 +1,5 @@
-import http.server
-import socketserver
+import BaseHTTPServer
+import SocketServer
 import threading
 import time
 import shutil
@@ -13,7 +13,7 @@ import traceback
 import consent
 import threading
 from cgi import parse_header, parse_multipart
-from urllib.parse import parse_qs
+from urlparse import parse_qs
 from serverconf import HOST_NAME, PORT_NUMBER
 
 
@@ -24,7 +24,7 @@ TRASHP = 3
 
 debug = True
 
-file = open
+
 errlog = sys.stdout
 if not debug:
     errlog = file("hanabi.log", "w")
@@ -101,15 +101,13 @@ def format_board(game, show, gid):
             title = "<h2>Game End<h2>Points: " + str(game.score()) + '<br/><a href="/new/study/%s">Play again</a>'%gid
         else:
             title = "<h2>Game End<h2>Points: " + str(game.score()) + '<br/><a href="/restart/">New game</a>'
-    def make_board_image(xxx_todo_changeme):
-        (i,card) = xxx_todo_changeme
+    def make_board_image((i,card)):
         return make_card_image(card, [], (BOARD,0,i) in show)
-    boardcards = list(map(make_board_image, enumerate(game.board)))
+    boardcards = map(make_board_image, enumerate(game.board))
     args = tuple([title] + boardcards)
     return board_template%args
 
-def format_action(xxx_todo_changeme12, gid, replay=None):
-    (i,(action,pnr,card)) = xxx_todo_changeme12
+def format_action((i,(action,pnr,card)), gid, replay=None):
     result = "You "
     other = "the AI"
     otherp = "their"
@@ -146,9 +144,8 @@ def format_action(xxx_todo_changeme12, gid, replay=None):
 
 def show_game_state(game, player, turn, gid, replay=False):
     
-    def make_ai_card(xxx_todo_changeme10, highlight):
+    def make_ai_card((i,(col,num)), highlight):
     
-        (i,(col,num)) = xxx_todo_changeme10
         hintlinks = [("Hint Rank", "/gid%s/%d/hintrank/%d"%(gid,turn,i)), ("Hint Color", "/gid%s/%d/hintcolor/%d"%(gid,turn,i))]
         if replay:
             (pgid,round,info) = replay 
@@ -164,8 +161,7 @@ def show_game_state(game, player, turn, gid, replay=False):
     
     while len(aicards) < 10:
         aicards.append("")
-    def make_your_card(xxx_todo_changeme11, highlight):
-        (i,(col,num)) = xxx_todo_changeme11
+    def make_your_card((i,(col,num)), highlight):
         playlinks = [("Play", "/gid%s/%d/play/%d"%(gid,turn,i)), ("Discard", "/gid%s/%d/discard/%d"%(gid,turn,i))]
         if replay:
             (pgid,round,info) = replay 
@@ -264,7 +260,7 @@ def show_game_state(game, player, turn, gid, replay=False):
         else:
             replaycontrol += '<tr><td colspan="3" align="center"><a href="/showsurvey/%s" target="_blank">Show survey answers</a></td></tr>'%root
         replaycontrol += "</table>"
-    args = tuple([str(hints), str(mistakes), str(cardsleft)] + trash + [replaycontrol] + aicards + [board] + yourcards + ["\n".join([format_action(x,gid, replay) for x in enumerate(list(reversed(player.actions))[:15])])])
+    args = tuple([str(hints), str(mistakes), str(cardsleft)] + trash + [replaycontrol] + aicards + [board] + yourcards + ["\n".join(map(lambda x: format_action(x,gid, replay), enumerate(list(reversed(player.actions))[:15])))])
     return template%args
 
 
@@ -283,8 +279,7 @@ def make_circle(x, y, col):
     return result%(x,y,col, r0, x,y, r1, x,y)
     
 
-def make_card_image(xxx_todo_changeme13, links=[], highlight=False):
-    (col,num) = xxx_todo_changeme13
+def make_card_image((col,num), links=[], highlight=False):
     image = """
 <svg version="1.1" width="125" height="160" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <rect width="125" height="160" x="0" y="0" fill="#66ccff"%s/>
@@ -311,7 +306,7 @@ def make_card_image(xxx_todo_changeme13, links=[], highlight=False):
     m = 70 # middle (vertical)
     b = 95 # bottom
     circles = {0: [], 1: [(c,m)], 2: [(l,t),(r,b)], 3: [(l,b), (r,b), (c,t)], 4: [(l,b), (r,b), (l,t), (r,t)], 5:[(l,b), (r,b), (l,t), (r,t), (c,m)]}
-    circ = "\n".join([make_circle(x_y[0],x_y[1],hanabi.COLORNAMES[col]) for x_y in circles[num]])
+    circ = "\n".join(map(lambda (x,y): make_circle(x,y,hanabi.COLORNAMES[col]), circles[num]))
     highlighttext = ""
     if highlight:
         highlighttext = ' stroke="red" stroke-width="4"'
@@ -352,8 +347,8 @@ class HTTPPlayer(hanabi.Player):
         self.name = name
         self.pnr = pnr
         self.actions = []
-        self.knows = [set() for i in range(5)]
-        self.aiknows = [set() for i in range(5)]
+        self.knows = [set() for i in xrange(5)]
+        self.aiknows = [set() for i in xrange(5)]
         self.show = []
     
     def inform(self, action, player, game):
@@ -496,28 +491,12 @@ def format_score(sc):
 # AIClasses
 ais = {"random": hanabi.Player, "inner": hanabi.InnerStatePlayer, "outer": hanabi.OuterStatePlayer, "self": hanabi.SelfRecognitionPlayer, "intentional": hanabi.IntentionalPlayer, "full": hanabi.SelfIntentionalPlayer}
 
-class _TextResponseWriter(object):
-    def __init__(self, raw):
-        self.raw = raw
-
-    def write(self, data):
-        if isinstance(data, str):
-            data = data.encode("utf-8")
-        return self.raw.write(data)
-
-    def flush(self):
-        return self.raw.flush()
-
-    def __getattr__(self, name):
-        return getattr(self.raw, name)
-    
-class MyHandler(http.server.BaseHTTPRequestHandler):
+class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_HEAD(s):
         s.send_response(200)
         s.send_header("Content-type", "text/html")
         s.end_headers()
     def do_GET(s):
-        s.wfile = _TextResponseWriter(s.wfile)
         try:
             return s.perform_response()
         except Exception:
@@ -650,8 +629,8 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             turn = 1
             player = HTTPPlayer("You", 1)
             log = file("log/game%s.log"%gid, "w")
-            print("Old GID:", oldgid, file=log)
-            print("Treatment:", t, file=log)
+            print >>log, "Old GID:", oldgid
+            print >>log, "Treatment:", t
             random.seed(nr)
             game = hanabi.Game([ai,player], log=log, format=1)
             game.treatment = t
@@ -681,7 +660,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             t = (type,nr)
             gid = s.getgid()
             log = file("log/game%s.log"%gid, "w")
-            print("Treatment:", t, file=log)
+            print >>log, "Treatment:", t
             game = hanabi.Game([ai,player], log=log, format=1)
             game.treatment = t
             game.ping = time.time()
@@ -739,7 +718,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         deck = None
                 elif l.startswith("MOVE:"):
-                    items = [s.strip() for s in l.strip().split()]
+                    items = map(lambda s: s.strip(), l.strip().split())
                     const, pnum, type, cnr, pnr, col, num = items
                     a = hanabi.Action(convert(type), convert(pnr), convert(col), convert(num), convert(cnr))
                     players[int(pnum)].actions.append(a)
@@ -755,13 +734,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             random.seed(deck)
             game = hanabi.Game(players, log=hanabi.NullStream())
             game.started = time.time()
-            for i in range(round):
+            for i in xrange(round):
                 game.single_turn()
             doaction = False
             turn = -1
             gid = ""
         elif path.startswith("/starttakeover/"):
-            items = [_f for _f in path.split("/") if _f]
+            items = filter(None, path.split("/"))
             if len(items) < 6:
                 s.wfile.write("<html><head><title>Hanabi</title></head>\n")
                 s.wfile.write('<body><h1>Invalid Game ID</h1>\n')
@@ -799,7 +778,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         deck = None
                 elif l.startswith("MOVE:"):
-                    items = [s.strip() for s in l.strip().split()]
+                    items = map(lambda s: s.strip(), l.strip().split())
                     const, pnum, type, cnr, pnr, col, num = items
                     a = hanabi.Action(convert(type), convert(pnr), convert(col), convert(num), convert(cnr))
                     players[int(pnum)].actions.append(a)
@@ -816,13 +795,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             gid = s.getgid()
             t = (ai,deck)
             log = file("log/game%s.log"%gid, "w")
-            print("Original:", oldgid, file=log)
-            print("Treatment:", t, file=log)
+            print >>log, "Original:", oldgid
+            print >>log, "Treatment:", t
             game = hanabi.Game(players, log=log, format=1)
             game.treatment = t
             game.ping = time.time()
             game.started = True
-            for i in range(round):
+            for i in xrange(round):
                 game.single_turn()
             game.players[0] = game.players[0].realplayer
             game.current_player = 1
@@ -859,7 +838,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             return
         elif path.startswith("/selectreplay/"):
             filters = path[14:].split("/")
-            filters = dict(list(zip(filters[::2], filters[1::2])))
+            filters = dict(zip(filters[::2], filters[1::2]))
             s.wfile.write("<html><head><title>Hanabi</title></head>\n")
             s.wfile.write('<body>')
             s.wfile.write('<h1>Replay selection</h1>')
@@ -917,12 +896,12 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                     if ai and deck and match(filters, ai, deck, score):
                         entry = '<li><a href="/replay/%s/1">Game %s (%s AI, %s, deck %d)</a></li>\n'%(gid, gid, ai, format_score(score), deck)
                         replays.append(((score if score else -1), entry))
-            replays.sort(key=lambda s_e: -s_e[0])
+            replays.sort(key=lambda(s,e): -s)
             for (score,entry) in replays:
                 s.wfile.write(entry)
             return
         elif path.startswith("/takeover/"):
-            items = [_f for _f in path.split("/") if _f]
+            items = filter(None, path.split("/"))
             
             if len(items) < 5:
                 s.wfile.write("<html><head><title>Hanabi</title></head>\n")
@@ -1078,7 +1057,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         responses = [("20s", "18-29 years"), ("30s", "30-39 years"), ("40s", "40-49 years"), ("50s", "50-64 years"), ("na", "Prefer not to answer")]
         default = -1
         if "age" in answers:
-            default = [a_b[0] for a_b in responses].index(answers["age"])
+            default = map(lambda (a,b): a, responses).index(answers["age"])
         s.add_choice("age", "What is your age?", responses, default)
         
         responses = [("new", "I never play board or card games"),
@@ -1087,13 +1066,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                              ("expert", "I often play board or card games")]
         default = -1
         if "bgg" in answers:
-            default = [a_b1[0] for a_b1 in responses].index(answers["bgg"])
+            default = map(lambda (a,b): a, responses).index(answers["bgg"])
         s.add_choice("bgg", "How familiar are you with the board and card games in general?", responses, default)
                             
         responses = [("yes", "Yes"), ("no", "No")]
         default = -1
         if "gamer" in answers:
-            default = [a_b2[0] for a_b2 in responses].index(answers["gamer"])
+            default = map(lambda (a,b): a, responses).index(answers["gamer"])
         s.add_choice("gamer", "Do you consider yourself to be a (board) gamer?", responses, default)
         
         responses = [("new", "I have never played before participating in this experiment"),
@@ -1102,7 +1081,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                              ("expert", "I have played many (&gt; 50) times")]
         default = -1
         if "exp" in answers:
-            default = [a_b3[0] for a_b3 in responses].index(answers["exp"])
+            default = map(lambda (a,b): a, responses).index(answers["exp"])
         s.add_choice("exp", "How familiar are you with the card game Hanabi?", responses, default)
         
         responses = [("never", "I have never played before or can't remember when I played the last time"),
@@ -1111,7 +1090,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                              ("recent", "The last time I played was recent (up to 3 months ago)")]
         default = -1
         if "recent" in answers:
-            default = [a_b4[0] for a_b4 in responses].index(answers["recent"])
+            default = map(lambda (a,b): a, responses).index(answers["recent"])
         s.add_choice("recent", "When was the last time that you played Hanabi before this experiment?", responses, default)
 
         responses = [("never", "I never reach the top score, or I have never played Hanabi"),
@@ -1120,13 +1099,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                                ("often", "I often reach the top score (about one in 5 or fewer games)")]
         default = -1
         if "score" in answers:
-            default = [a_b5[0] for a_b5 in responses].index(answers["score"])
+            default = map(lambda (a,b): a, responses).index(answers["score"])
         s.add_choice("score", "How often do you typically reach the top score of 25 in Hanabi?", responses, default,)
                                
         responses = [("yes", "Yes"), ("no", "No")]
         default = 0
         if "gamer" in answers:
-            default = [a_b6[0] for a_b6 in responses].index(answers["publish"])                    
+            default = map(lambda (a,b): a, responses).index(answers["publish"])                    
         s.add_choice("publish", "For this study we have recorded your answers to this survey, as well as a log of actions that you performed in the game. We have <b>not</b> recorded your IP address or any other information that could be linked back to you. Do you agree that we make your answers to the survey and the game log publicly available for future research?", 
                               responses, default)
         
@@ -1150,7 +1129,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                              ("5", "Always performed goal-directed actions")]
         default = -1
         if "intention" in answers:
-            default = [a_b7[0] for a_b7 in responses].index(answers["intention"])
+            default = map(lambda (a,b): a, responses).index(answers["intention"])
         s.add_choice("intention", "How intentional/goal-directed did you think this AI was playing?", responses, default)
         
         responses = [("vbad", "The AI played very badly"),
@@ -1160,7 +1139,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                                ("vgood", "The AI played very well")]
         default = -1
         if "skill" in answers:
-            default = [a_b8[0] for a_b8 in responses].index(answers["skill"])
+            default = map(lambda (a,b): a, responses).index(answers["skill"])
         s.add_choice("skill", "How would you rate the play skill of this AI?", responses, default)
 
         responses = [("vhate", "I really disliked playing with this AI"),
@@ -1170,7 +1149,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                                ("vlike", "I really liked playing with this AI")]
         default = -1
         if "like" in answers:
-            default = [a_b9[0] for a_b9 in responses].index(answers["like"])
+            default = map(lambda (a,b): a, responses).index(answers["like"])
         s.add_choice("like", "How much did you enjoy playing with this AI?", responses, default)
         
         
@@ -1189,11 +1168,9 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         
     def getgid(s):
         peer = str(s.connection.getpeername()) + str(time.time()) + str(os.urandom(4))
-        return hashlib.sha224(peer.encode("utf-8")).hexdigest()[:16]
-        
+        return hashlib.sha224(peer).hexdigest()[:16]
         
     def do_POST(s):
-        s.wfile = _TextResponseWriter(s.wfile)
         s.send_response(200)
         s.send_header("Content-type", "text/html")
         s.end_headers()
@@ -1209,13 +1186,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                 gid = vars["gid"]
 
             if gid not in participants:
-                print(gid, "not in participants", participants, file=errlog)
+                print >>errlog, gid, "not in participants", participants
                 return s.presurvey(gid)
             
             participantslock.acquire()
             for r in required:
                 if r in vars:
-                    print(r, vars[r], file=participants[gid])
+                    print >> participants[gid], r, vars[r]
             participants[gid].close()
             del participants[gid]
             del participantstarts[gid]
@@ -1250,7 +1227,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             turn = 1
             player = HTTPPlayer("You", 1)
             log = file("log/game%s.log"%gid, "w")
-            print("Treatment:", t, file=log)
+            print >>log, "Treatment:", t
             random.seed(t[1])
             game = hanabi.Game([ai,player], log=log, format=1)
             game.treatment = t
@@ -1288,7 +1265,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             participantslock.acquire()
             for r in required:
                 if r in vars:
-                    print(r, vars[r], file=participants[gid])
+                    print >> participants[gid], r, vars[r]
             participants[gid].flush()
             participantslock.release()
             s.presurvey(gid)
@@ -1301,11 +1278,11 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         s.wfile.write('<center><font size="12"><a href="/tutorial">By clicking here I agree to participate in the study</a></font></center><br/><br/><br/>')
         s.wfile.write("</body></html>")
  
-class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class ThreadingHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     def finish_request(self, request, client_address):
         request.settimeout(30)
         # "super" can not be used because BaseServer is not created from object
-        http.server.HTTPServer.finish_request(self, request, client_address) 
+        BaseHTTPServer.HTTPServer.finish_request(self, request, client_address) 
  
 if __name__ == '__main__':
     server_class = ThreadingHTTPServer
