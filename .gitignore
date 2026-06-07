@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+results4p/*.csv
+results4p/*.png
+results4p/.DS_Store
+
+learning_curve*.png
+method_score_curve*.png
