@@ -1,0 +1,12 @@
+Base seed: 123456
+
+=== Agent Composition Comparison ===
+Setting                 Mean       Std    Min    Max
+--------------------------------------------------------
+4Adaptive              18.23      1.64     13     23
+4Full                  16.68      1.45      9     21
+1Adaptive+3Full        16.88      1.47      8     21
+--------------------------------------------------------
+4Adaptive - 4Full              diff=+1.54, SE=0.059, 95%CI=[+1.43,+1.66], p=8.568e-117 ***, dz=0.822, Win%=72.6%
+1Adaptive+3Full - 4Full        diff=+0.20, SE=0.041, 95%CI=[+0.12,+0.28], p=1.687e-06 ***, dz=0.146, Win%=34.8%
+4Adaptive - 1Adaptive+3Full    diff=+1.35, SE=0.058, 95%CI=[+1.23,+1.46], p=2.409e-96 ***, dz=0.725, Win%=67.6%

@@ -1,0 +1,19 @@
+Base seed: 123456
+Teammate mode: hybrid
+Teammate sets shared by compared P0 methods:
+  TeamSet1: P1=realistic_style(815744163), P2=manual_style(SET_C_COLOR_SPEAKER), P3=realistic_style(220594956)
+  TeamSet2: P1=manual_style(SET_F_PRECISION_TEACHER), P2=manual_style(SET_C_COLOR_SPEAKER), P3=realistic_style(636152441)
+  TeamSet3: P1=realistic_style(285696098), P2=realistic_style(305205192), P3=manual_style(SET_D_RANK_SPEAKER)
+  TeamSet4: P1=manual_style(SET_D_RANK_SPEAKER), P2=manual_style(SET_D_RANK_SPEAKER), P3=manual_style(SET_E_BROADCASTER)
+  TeamSet5: P1=manual_style(SET_F_PRECISION_TEACHER), P2=manual_style(SET_B_SAFETY_MANAGER), P3=realistic_style(332050371)
+
+=== Hanabi Communication Comparison ===
+TeamSet      Outer   Intentional      Full    Adaptive    A-Full       SE               95% CI            p     Win%
+----------------------------------------------------------------------------------------------------------------
+set1         13.28         13.85     14.60       15.09     +0.48    0.047        [+0.39,+0.58]  p=2.137e-23 ***    45.1%
+set2         13.48         14.88     15.51       16.16     +0.65    0.048        [+0.55,+0.74]  p=7.945e-38 ***    52.8%
+set3         13.86         15.28     15.98       16.63     +0.64    0.054        [+0.53,+0.75]  p=2.055e-30 ***    54.2%
+set4         13.36         14.64     15.21       15.92     +0.71    0.052        [+0.61,+0.81]  p=4.214e-39 ***    53.4%
+set5         11.17         12.00     12.55       13.01     +0.46    0.052        [+0.36,+0.56]  p=8.189e-18 ***    48.2%
+----------------------------------------------------------------------------------------------------------------
+ALL          13.03         14.13     14.77       15.36     +0.59    0.023        [+0.54,+0.63]  p=5.065e-137 ***    50.7%
